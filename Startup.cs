@@ -1,36 +1,47 @@
 using System;
-using System.IO;
 using Autofac;
 using Microsoft.AspNet.Builder;
-using Microsoft.AspNet.Mvc;
 using Microsoft.AspNet.Mvc.Razor;
-using Microsoft.Framework.Configuration;
 using Microsoft.Framework.DependencyInjection;
 using Microsoft.Framework.DependencyInjection.Autofac;
-using Microsoft.Framework.Runtime;
-using Microsoft.Framework.Runtime.Infrastructure;
 
-namespace MvcSample.Web
-{
-    public class Startup
-    {
-        public IServiceProvider ConfigureServices(IServiceCollection services)
-        {
-                // Create the autofac container
-            var builder = new ContainerBuilder();
-            builder.RegisterModule<TestModule>();
-            builder.Populate(services);
+namespace MvcSample.Web {
+    public class Startup {
+        public IServiceProvider ConfigureServices(IServiceCollection services) {
+            var builder1 = new ContainerBuilder();
+            builder1.RegisterModule<TestModule>();
+            builder1.Populate(services);
 
-            var container = builder.Build();
+            var container1 = builder1.Build();
 
-            return container.Resolve<IServiceProvider>();
+            var nonScopeOptions = container1.Resolve<IServiceProvider>()
+                .GetService<Microsoft.Framework.OptionsModel.IOptions<RazorViewEngineOptions>>()
+                .Options;
+
+            Console.WriteLine("{0} Options", nonScopeOptions.ViewLocationExpanders.Count);
+            Console.WriteLine("");
+
+            var builder2 = new ContainerBuilder();
+            builder2.Populate(services);
+
+            var container2 = builder2.Build();
+
+            var scope = container2.BeginLifetimeScope((inner) => {
+                inner.RegisterModule<TestModule>();
+            }).Resolve<IServiceProvider>();
+
+            var scopeOptions = scope
+                .GetService<Microsoft.Framework.OptionsModel.IOptions<RazorViewEngineOptions>>()
+                .Options;
+
+            Console.WriteLine("{0} Options", scopeOptions.ViewLocationExpanders.Count);
+
+
+            return container1.Resolve<IServiceProvider>();
         }
 
-        public void Configure(IApplicationBuilder app)
-        {
-            
-            app.UseMvc(routes =>
-            {
+        public void Configure(IApplicationBuilder app) {
+            app.UseMvc(routes => {
                 routes.MapRoute(
                     "controllerActionRoute",
                     "{controller}/{action}",
@@ -39,15 +50,16 @@ namespace MvcSample.Web
                     dataTokens: new { NameSpace = "default" });
             });
         }
+        
 
-        private class TestModule : Autofac.Module
-        {
-            protected override void Load(ContainerBuilder builder)
-            {
+        private class TestModule : Autofac.Module {
+            protected override void Load(ContainerBuilder builder) {
+                Console.WriteLine("Registering Module");
+
                 var services2 = new ServiceCollection();
                 services2.AddMvc();
-                services2.ConfigureRazorViewEngine(options =>
-                {
+                services2.ConfigureRazorViewEngine(options => {
+                    Console.WriteLine("Registering TestViewLocationExpander");
                     options.ViewLocationExpanders.Add(new TestViewLocationExpander());
                 });
 
